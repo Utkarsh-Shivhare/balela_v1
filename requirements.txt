@@ -1,0 +1,12 @@
+flask>=2.0.1
+Werkzeug>=2.0.1
+pydantic>=2.3.0
+PyPDF2>=3.0.0
+numpy>=1.24.0
+python-dotenv>=1.0.0
+langchain-openai>=0.0.2
+langchain-core>=0.1.0
+langchain>=0.0.335
+asyncio>=3.4.3
+requests>=2.31.0
+sseclient-py>=1.8.0 
