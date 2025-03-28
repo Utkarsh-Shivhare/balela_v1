@@ -22,7 +22,13 @@ cd balela_v1
 pip install -r requirements.txt
 ```
 
-3. Run the application:
+3. Set up your OpenAI API key:
+```
+cp .env.example .env
+```
+Then edit the `.env` file and add your OpenAI API key.
+
+4. Run the application:
 ```
 python flask_app.py
 ```
