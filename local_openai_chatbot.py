@@ -10,15 +10,18 @@ import json
 import numpy as np
 from pathlib import Path
 from datetime import datetime
+import platform
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logger = logging.getLogger(__name__)
 
 class LocalOpenAIChatBot:
     def __init__(self, OPENAI_API_KEY):
+        # Load environment variables, useful for additional configuration
         load_dotenv()
         
-        logging.info("Initializing LocalOpenAIChatBot")
+        logger.info("Initializing LocalOpenAIChatBot")
         
         self.llm = ChatOpenAI(
             model_name="gpt-4o",
@@ -33,12 +36,21 @@ class LocalOpenAIChatBot:
         # Initialize embeddings
         self.embeddings = OpenAIEmbeddings(api_key=OPENAI_API_KEY)
         
-        # Create data directory if it doesn't exist
-        self.data_dir = Path("vector_store")
+        # Create data directory using platform-agnostic path handling
+        self.data_dir = Path(os.path.abspath("vector_store"))
         self.data_dir.mkdir(exist_ok=True)
+        logger.info(f"Vector store directory: {self.data_dir}")
         
-        # Use the same template as the homework chatbot
-        from instruction.home_work_chatbot_template import HOMEWORK_CHATBOT_TEMPLATE
+        # Import template with proper path handling to avoid import issues
+        try:
+            # Try absolute import first
+            from instruction.home_work_chatbot_template import HOMEWORK_CHATBOT_TEMPLATE
+        except ImportError:
+            # Fall back to relative import approach if needed
+            import sys
+            sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            from instruction.home_work_chatbot_template import HOMEWORK_CHATBOT_TEMPLATE
+            
         self.GROUNDED_PROMPT = HOMEWORK_CHATBOT_TEMPLATE
         self.prompt = PromptTemplate(
             template=self.GROUNDED_PROMPT,
@@ -61,18 +73,21 @@ class LocalOpenAIChatBot:
                 "timestamp": datetime.now().isoformat()
             }
             
-            # Create filename based on user_id and document_id
+            # Create filename based on user_id and document_id with proper path handling
             filename = self.data_dir / f"{user_id}_{document_id}.json"
             
-            # Save to file
-            with open(filename, 'w') as f:
-                json.dump(document, f)
+            # Ensure directory exists (in case it was deleted after initialization)
+            self.data_dir.mkdir(exist_ok=True)
             
-            logging.info(f"Document saved successfully to {filename}")
+            # Save to file with explicit encoding for cross-platform compatibility
+            with open(filename, 'w', encoding='utf-8') as f:
+                json.dump(document, f, ensure_ascii=False)
+            
+            logger.info(f"Document saved successfully to {filename}")
             return True
             
         except Exception as e:
-            logging.error(f"Error saving document: {str(e)}")
+            logger.error(f"Error saving document: {str(e)}")
             return False
 
     def cosine_similarity(self, a, b):
@@ -80,7 +95,7 @@ class LocalOpenAIChatBot:
         return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
 
     def search(self, query, user_id, document_id):
-        logging.info(f"Searching for query: '{query}' for user_id: '{user_id}' and document_id: '{document_id}'")
+        logger.info(f"Searching for query: '{query}' for user_id: '{user_id}' and document_id: '{document_id}'")
         try:
             # Get embeddings for the query
             query_embedding = self.embeddings.embed_query(query)
@@ -90,10 +105,11 @@ class LocalOpenAIChatBot:
             filename = self.data_dir / f"{user_id}_{document_id}.json"
             
             if not filename.exists():
-                logging.warning(f"No documents found for user_id: {user_id} and document_id: {document_id}")
+                logger.warning(f"No documents found for user_id: {user_id} and document_id: {document_id}")
                 return []
             
-            with open(filename, 'r') as f:
+            # Open with explicit encoding for cross-platform compatibility
+            with open(filename, 'r', encoding='utf-8') as f:
                 doc = json.load(f)
                 
             if not doc["is_book"]:  # Skip if it's marked as a book
@@ -108,20 +124,20 @@ class LocalOpenAIChatBot:
             return results[:10]  # Return top 10 results
             
         except Exception as e:
-            logging.error(f"Error during search: {str(e)}")
+            logger.error(f"Error during search: {str(e)}")
             raise
 
     def format_sources(self, search_results):
-        logging.info("Formatting search results.")
+        logger.info("Formatting search results.")
         formatted_sources = "=================\n".join([
             f'CONTENT: {result["metadata"]["content"]}' 
             for result in search_results
         ])
-        logging.debug(f"Formatted sources: {formatted_sources}")
+        logger.debug(f"Formatted sources: {len(formatted_sources)} characters")
         return formatted_sources
 
     def generate_response_stream(self, query, sources_formatted, chat_history):
-        logging.info("Streaming response generation using Prompt Template.")
+        logger.info("Streaming response generation using Prompt Template.")
         try:
             chain = self.prompt | self.llm | StrOutputParser()
             
@@ -134,12 +150,12 @@ class LocalOpenAIChatBot:
                 yield chunk
 
         except Exception as e:
-            logging.error(f"Error during streaming generation: {str(e)}")
+            logger.error(f"Error during streaming generation: {str(e)}")
             yield json.dumps({"error": str(e)})
 
     def get_context_resources_from_db(self, query, user_id, document_id):
-        logging.info(f"Starting chat with query: '{query}'")
+        logger.info(f"Starting chat with query: '{query}'")
         search_results = self.search(query, user_id, document_id)
         sources_formatted = self.format_sources(search_results)
-        logging.debug(f"Sources formatted: {len(sources_formatted)} characters")
+        logger.debug(f"Sources formatted: {len(sources_formatted)} characters")
         return sources_formatted 
