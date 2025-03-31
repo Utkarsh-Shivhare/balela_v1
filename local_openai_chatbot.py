@@ -8,9 +8,8 @@ import logging
 from langchain_core.output_parsers import StrOutputParser
 import json
 import numpy as np
-from pathlib import Path
 from datetime import datetime
-import platform
+from database import init_db, save_document_to_db, get_document_from_db
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -24,7 +23,7 @@ class LocalOpenAIChatBot:
         logger.info("Initializing LocalOpenAIChatBot")
         
         self.llm = ChatOpenAI(
-            model_name="gpt-4o",
+            model_name="gpt-4",
             temperature=0.3,
             max_tokens=None,
             timeout=None,
@@ -36,17 +35,14 @@ class LocalOpenAIChatBot:
         # Initialize embeddings
         self.embeddings = OpenAIEmbeddings(api_key=OPENAI_API_KEY)
         
-        # Create data directory using platform-agnostic path handling
-        self.data_dir = Path(os.path.abspath("vector_store"))
-        self.data_dir.mkdir(exist_ok=True)
-        logger.info(f"Vector store directory: {self.data_dir}")
+        # Initialize database connection
+        self.engine, Session = init_db()
+        self.Session = Session
         
         # Import template with proper path handling to avoid import issues
         try:
-            # Try absolute import first
             from instruction.home_work_chatbot_template import HOMEWORK_CHATBOT_TEMPLATE
         except ImportError:
-            # Fall back to relative import approach if needed
             import sys
             sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
             from instruction.home_work_chatbot_template import HOMEWORK_CHATBOT_TEMPLATE
@@ -58,33 +54,26 @@ class LocalOpenAIChatBot:
         )
 
     def save_document(self, content, user_id, document_id, is_book=False):
-        """Save a document with its embedding to the local store."""
+        """Save a document with its embedding to the database."""
         try:
             # Generate embedding for the content
             embedding = self.embeddings.embed_query(content)
             
-            # Create document entry
-            document = {
-                "content": content,
-                "embedding": embedding,
-                "user_id": user_id,
-                "document_id": document_id,
-                "is_book": is_book,
-                "timestamp": datetime.now().isoformat()
-            }
+            # Create database session
+            session = self.Session()
             
-            # Create filename based on user_id and document_id with proper path handling
-            filename = self.data_dir / f"{user_id}_{document_id}.json"
+            # Save to database
+            success = save_document_to_db(
+                session=session,
+                user_id=user_id,
+                document_id=document_id,
+                content=content,
+                embedding=embedding,
+                is_book=is_book
+            )
             
-            # Ensure directory exists (in case it was deleted after initialization)
-            self.data_dir.mkdir(exist_ok=True)
-            
-            # Save to file with explicit encoding for cross-platform compatibility
-            with open(filename, 'w', encoding='utf-8') as f:
-                json.dump(document, f, ensure_ascii=False)
-            
-            logger.info(f"Document saved successfully to {filename}")
-            return True
+            session.close()
+            return success
             
         except Exception as e:
             logger.error(f"Error saving document: {str(e)}")
@@ -100,19 +89,19 @@ class LocalOpenAIChatBot:
             # Get embeddings for the query
             query_embedding = self.embeddings.embed_query(query)
             
-            results = []
-            # Load and search through all documents for the specific user and document
-            filename = self.data_dir / f"{user_id}_{document_id}.json"
+            # Create database session
+            session = self.Session()
             
-            if not filename.exists():
+            # Get document from database
+            doc = get_document_from_db(session, user_id, document_id)
+            session.close()
+            
+            if not doc:
                 logger.warning(f"No documents found for user_id: {user_id} and document_id: {document_id}")
                 return []
             
-            # Open with explicit encoding for cross-platform compatibility
-            with open(filename, 'r', encoding='utf-8') as f:
-                doc = json.load(f)
-                
-            if not doc["is_book"]:  # Skip if it's marked as a book
+            results = []
+            if not doc["is_book"]:
                 similarity = self.cosine_similarity(query_embedding, doc["embedding"])
                 results.append({
                     "metadata": {"content": doc["content"]},

@@ -12,4 +12,9 @@ langchain-openai>=0.0.2
 langchain-core>=0.1.0
 langchain>=0.0.335
 requests>=2.31.0
-sseclient-py>=1.8.0 
+sseclient-py>=1.8.0
+
+# Database
+mysql-connector-python>=8.0.0
+SQLAlchemy>=2.0.0
+cryptography>=41.0.0  # Required for SSL connections 

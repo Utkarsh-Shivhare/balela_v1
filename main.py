@@ -22,7 +22,6 @@ logger = logging.getLogger(__name__)
 
 # Get API key from environment variable
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "YOUR_API_KEY_HERE")  # Default placeholder for documentation
-
 # Check if API key is available
 if OPENAI_API_KEY == "YOUR_API_KEY_HERE":
     logger.warning("No valid API key found. Please set your OPENAI_API_KEY in the .env file.")
