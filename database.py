@@ -117,3 +117,14 @@ def get_document_from_db(session, user_id, document_id):
     except Exception as e:
         logger.error(f"Error retrieving document from database: {str(e)}")
         return None 
+def delete_document_by_document_id(document_id):
+    table_name="documents"
+    try:
+        session = init_db()
+        session.query(table_name).filter_by(document_id=document_id).delete()
+        session.commit()
+        logger.info(f"Document with document_id '{document_id}' deleted successfully")
+        return True
+    except Exception as e:
+        logger.error(f"Error deleting document from database: {str(e)}")
+        return False
