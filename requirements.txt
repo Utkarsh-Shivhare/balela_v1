@@ -17,4 +17,9 @@ sseclient-py>=1.8.0
 # Database
 mysql-connector-python>=8.0.0
 SQLAlchemy>=2.0.0
-cryptography>=41.0.0  # Required for SSL connections 
+cryptography>=41.0.0  # Required for SSL connections
+
+# Vector Store
+weaviate-client==4.7.3  # Pinned to specific version for stability
+langchain-community>=0.0.16 
+pymupdf==1.25.5

@@ -3,12 +3,14 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from database import delete_document_by_document_id
 from learning_assistant_agents import *
-from local_openai_chatbot import LocalOpenAIChatBot
+from local_openai_chatbot import *
+from vector_store import WeaviateVectorStore
 from typing import List, Optional
 from pydantic import BaseModel
 import os
 import json
-from PyPDF2 import PdfReader
+# from PyPDF2 import PdfReader
+import pymupdf
 from typing import List
 import asyncio
 from pathlib import Path
@@ -17,6 +19,7 @@ import uvicorn
 import logging
 from dotenv import load_dotenv
 from writing_assistant_agents import *
+from vector_store import *
 
 # Load environment variables
 load_dotenv()
@@ -78,16 +81,19 @@ if not os.path.exists(UPLOAD_FOLDER):
 # Initialize chatbot with API key
 chatbot = LocalOpenAIChatBot(OPENAI_API_KEY)
 
+# Initialize vector store
+vector_store = WeaviateVectorStore()
+
 # Helper functions
 def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 def extract_text_from_pdf(file_path):
     try:
-        reader = PdfReader(file_path)
+        reader = pymupdf.open(file_path)
         text = ""
-        for page in reader.pages:
-            text += page.extract_text() + "\n"
+        for page in reader:
+            text += page.get_text() + "\n"
         return text.strip()
     except Exception as e:
         logger.error(f"Error extracting text from PDF: {str(e)}")
@@ -170,6 +176,7 @@ async def upload_documents(
             # Extract text from PDF
             if file.content_type == "application/pdf":
                 extracted_data = extract_text_from_pdf(file_path)
+                print("extracted_data", extracted_data)
             else:
                 # For now, we're only handling PDFs in this implementation
                 extracted_data = f"Image content from {file.filename} - text extraction not implemented"
@@ -193,7 +200,7 @@ async def upload_documents(
 
     return {"files_processed": len(results), "results": results}
 
-@app.post("/chat/")
+@app.post("/chat/", tags=["Homework Assistance"])
 async def chat(
     query: str = Form(...),
     chat_history: str = Form("[]"),
@@ -217,7 +224,7 @@ async def chat(
         
         # Get context resources
         sources_formatted = chatbot.get_context_resources_from_db(query, user_id, document_id)
-        
+        print("sources_formatted", sources_formatted)
         # Return a StreamingResponse with the generator directly
         return StreamingResponse(
             chatbot.generate_response_stream(query, sources_formatted, chat_history_obj),
@@ -470,36 +477,26 @@ async def delete_document_endpoint(
     document_id: str = Form(...)
 ):
     """
-    Deletes documents from the vector store using the specified document ID. 
-    Checks if the document exists before deletion.
-
-    Inputs:
-    - document_id (str): The unique ID of the document to delete.
-
-    Returns:
-    JSON response:
-    - status (str): `"success"` if the document is deleted.
-    - message (str): Confirmation message or error details.
+    Delete a document and its associated vector embeddings.
     """
     try:
-        response = delete_document_by_document_id(document_id)
-        if response:
-            logger.info(f"Documents with document_id '{document_id}' have been deleted.")
-            return JSONResponse(
-                status_code=200,
-                content={"status": "success", "message": f"Documents with document_id '{document_id}' have been deleted."}
-            )
+        # Delete from vector store
+        vector_store_success = vector_store.delete_documents(document_id)
+        
+        # Delete from SQL database (if needed)
+        # sql_success = delete_documents(document_id)
+        
+        if vector_store_success:
+            return {"message": f"Document {document_id} successfully deleted"}
         else:
-            logger.warning(f"No documents found with document_id '{document_id}'.")
-            return JSONResponse(
-                status_code=404,
-                content={"status": "error", "message": f"No documents found with document_id '{document_id}'."}
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to delete document {document_id} from one or more storage systems"
             )
     except Exception as e:
-        logger.error(f"Failed to delete documents: {str(e)}")
-        return JSONResponse(
+        raise HTTPException(
             status_code=500,
-            content={"status": "error", "message": f"Failed to delete documents: {str(e)}"}
+            detail=f"Error deleting document: {str(e)}"
         )
 
 @app.post("/test_analyser/", tags=['Learning Assistant'])

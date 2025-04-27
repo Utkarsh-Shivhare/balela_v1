@@ -117,14 +117,37 @@ def get_document_from_db(session, user_id, document_id):
     except Exception as e:
         logger.error(f"Error retrieving document from database: {str(e)}")
         return None 
+
 def delete_document_by_document_id(document_id):
-    table_name="documents"
+    """Delete a document from the database by its document_id."""
     try:
-        session = init_db()
-        session.query(table_name).filter_by(document_id=document_id).delete()
-        session.commit()
-        logger.info(f"Document with document_id '{document_id}' deleted successfully")
-        return True
+        # Get database engine and Session
+        engine, Session = init_db()
+        
+        # Create a new session
+        session = Session()
+        
+        try:
+            # Delete all documents with matching document_id
+            result = session.query(Document).filter_by(document_id=document_id).delete()
+            
+            # Commit the transaction
+            session.commit()
+            
+            if result > 0:
+                logger.info(f"Successfully deleted {result} document(s) with document_id: {document_id}")
+                return True
+            else:
+                logger.warning(f"No documents found with document_id: {document_id}")
+                return False
+                
+        except Exception as e:
+            session.rollback()
+            logger.error(f"Error during document deletion: {str(e)}")
+            return False
+        finally:
+            session.close()
+            
     except Exception as e:
-        logger.error(f"Error deleting document from database: {str(e)}")
+        logger.error(f"Error initializing database connection for deletion: {str(e)}")
         return False
