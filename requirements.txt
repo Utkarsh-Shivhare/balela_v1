@@ -23,3 +23,7 @@ cryptography>=41.0.0  # Required for SSL connections
 weaviate-client==4.7.3  # Pinned to specific version for stability
 langchain-community>=0.0.16 
 pymupdf==1.25.5
+
+# Image processing
+pillow>=10.0.0  # For image handling
+base64io>=1.0.3  # For base64 encoding/decoding

@@ -9,7 +9,7 @@ from typing import List, Optional
 from pydantic import BaseModel
 import os
 import json
-# from PyPDF2 import PdfReader
+from PyPDF2 import PdfReader
 import pymupdf
 from typing import List
 import asyncio
@@ -20,6 +20,7 @@ import logging
 from dotenv import load_dotenv
 from writing_assistant_agents import *
 from vector_store import *
+import base64
 
 # Load environment variables
 load_dotenv()
@@ -46,6 +47,7 @@ logger = logging.getLogger(__name__)
 
 # Get API key from environment variable
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "YOUR_API_KEY_HERE")  # Default placeholder for documentation
+OPENAI_API_KEY = "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"
 # Check if API key is available
 if OPENAI_API_KEY == "YOUR_API_KEY_HERE":
     logger.warning("No valid API key found. Please set your OPENAI_API_KEY in the .env file.")
@@ -90,10 +92,10 @@ def allowed_file(filename):
 
 def extract_text_from_pdf(file_path):
     try:
-        reader = pymupdf.open(file_path)
+        reader = PdfReader(file_path)
         text = ""
-        for page in reader:
-            text += page.get_text() + "\n"
+        for page in reader.pages:
+            text += page.extract_text() + "\n"
         return text.strip()
     except Exception as e:
         logger.error(f"Error extracting text from PDF: {str(e)}")
@@ -205,7 +207,8 @@ async def chat(
     query: str = Form(...),
     chat_history: str = Form("[]"),
     document_id: str = Form(...),
-    user_id: str = Form(...)
+    user_id: str = Form(...),
+    images: List[UploadFile] = File([])  # Make it optional
 ):
     """
     Provides a chat interface that responds to queries using context from stored documents.
@@ -214,20 +217,37 @@ async def chat(
     - **chat_history**: JSON string containing previous conversation (default empty array)
     - **document_id**: The ID of the document to search for context
     - **user_id**: The ID of the user who owns the document
+    - **images**: Optional list of image files to include in the conversation
     
     Returns a streaming response with chunks of the assistant's reply.
     """
-    logger.info(f"Chat endpoint called for user_id: {user_id}, document_id: {document_id}")
+    logger.info(f"Chat endpoint called for user_id: {user_id}, document_id: {document_id}, with {len(images)} images")
     try:
         # Parse chat history
         chat_history_obj = json.loads(chat_history) if chat_history else []
         
         # Get context resources
         sources_formatted = chatbot.get_context_resources_from_db(query, user_id, document_id)
-        print("sources_formatted", sources_formatted)
+        
+        # Process images if provided
+        image_data = []
+        for img in images:
+            # Read the image data
+            img_content = await img.read()
+            # Convert to base64
+            base64_img = base64.b64encode(img_content).decode("utf-8")
+            # Get the MIME type
+            mime_type = img.content_type or "image/jpeg"  # Default to JPEG if not provided
+            
+            # Store the image data
+            image_data.append({
+                "base64_data": base64_img,
+                "mime_type": mime_type
+            })
+        
         # Return a StreamingResponse with the generator directly
         return StreamingResponse(
-            chatbot.generate_response_stream(query, sources_formatted, chat_history_obj),
+            chatbot.generate_response_stream(query, sources_formatted, chat_history_obj, image_data),
             media_type='text/event-stream'
         )
         

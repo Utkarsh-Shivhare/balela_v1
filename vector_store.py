@@ -28,7 +28,7 @@ class WeaviateVectorStore:
         protocol = parsed_url.scheme
         
         try:
-            # Initialize Weaviate client with v4 syntax
+        # Initialize Weaviate client with v4 syntax
             self.client = weaviate.connect_to_custom(
                 http_host=host,
                 http_port=8080,
@@ -42,11 +42,11 @@ class WeaviateVectorStore:
             )
             
             logger.info(f"Successfully connected to Weaviate at {weaviate_url}")
-            
+        
             # Define the class name for documents
             self.class_name = "Document"
             
-            # Create schema if it doesn't exist
+                # Create schema if it doesn't exist
             self._create_schema()
             
         except Exception as e:
@@ -57,7 +57,7 @@ class WeaviateVectorStore:
         """Normalize a vector to unit length."""
         norm = np.linalg.norm(vector)
         return (np.array(vector) / norm).tolist() if norm != 0 else vector
-
+    
     def _create_schema(self):
         """Create the Weaviate schema if it doesn't exist."""
         try:
@@ -78,25 +78,25 @@ class WeaviateVectorStore:
                     distance_metric=Configure.VectorDistances.COSINE
                 ),
                 properties=[
-                    {
-                        "name": "content",
-                        "dataType": ["text"],
+                        {
+                            "name": "content",
+                            "dataType": ["text"],
                         "description": "The content of the document",
                         "indexInverted": True,  # Enable BM25 text search
-                    },
-                    {
-                        "name": "user_id",
+                        },
+                        {
+                            "name": "user_id",
                         "dataType": ["text"],
                         "description": "ID of the user who owns this document"
-                    },
-                    {
-                        "name": "document_id",
+                        },
+                        {
+                            "name": "document_id",
                         "dataType": ["text"],
                         "description": "Unique identifier for the document"
-                    },
-                    {
-                        "name": "metadata",
-                        "dataType": ["text"],
+                        },
+                        {
+                            "name": "metadata",
+                            "dataType": ["text"],
                         "description": "Additional metadata"
                     },
                     {
@@ -111,7 +111,7 @@ class WeaviateVectorStore:
         except Exception as e:
             if "already exists" not in str(e):
                 logger.error(f"Error creating schema: {str(e)}")
-                raise
+            raise
 
     def add_documents(self, texts: List[str], embeddings: List[List[float]], 
                      user_id: str, document_id: str, metadata: Optional[Dict[str, Any]] = None):
@@ -312,11 +312,11 @@ class WeaviateVectorStore:
                     except:
                         pass
                 
-                doc = Document(
+                    doc = Document(
                     page_content=obj.properties["content"],
                     metadata=metadata
-                )
-                documents.append(doc)
+                    )
+                    documents.append(doc)
             
             return documents
         except Exception as e:
@@ -354,7 +354,7 @@ class WeaviateVectorStore:
             
         except Exception as e:
             logger.error(f"Error connecting to Weaviate: {str(e)}")
-            return False
+            return False 
 
     def __del__(self):
         """Cleanup when the object is destroyed"""

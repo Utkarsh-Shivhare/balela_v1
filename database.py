@@ -133,7 +133,7 @@ def delete_document_by_document_id(document_id):
             
             # Commit the transaction
             session.commit()
-            
+                
             if result > 0:
                 logger.info(f"Successfully deleted {result} document(s) with document_id: {document_id}")
                 return True
