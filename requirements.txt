@@ -20,7 +20,7 @@ SQLAlchemy>=2.0.0
 cryptography>=41.0.0  # Required for SSL connections
 
 # Vector Store
-weaviate-client==4.7.3  # Pinned to specific version for stability
+weaviate-client==4.13.2  # Pinned to specific version for stability
 langchain-community>=0.0.16 
 pymupdf==1.25.5
 
