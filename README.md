@@ -10,6 +10,18 @@ Balela AI is a comprehensive AI-powered learning assistant that helps users with
 - **Writing Assistance**: Grammar checking, rephrasing, feedback, and more
 - **Multimodal Chat**: Send images along with your text queries to get visual analysis and responses
 
+## Authentication
+
+All API endpoints (except the root `/` endpoint) require authentication. You must include the API key in your request headers using one of the following header names:
+
+- `Authorization`
+- `X-API-Key` 
+- `api-key`
+
+**Required API Key**: `a20d4fdd36062aa2bd56b6ee8b92cd1a`
+
+If the API key is missing or incorrect, you'll receive a 400 status code with an authentication error message.
+
 ## New Feature: Multimodal Chat
 
 You can now include images in your conversations with Balela AI. The AI will analyze the images and respond to your queries about them.
@@ -24,6 +36,7 @@ Example using cURL:
 
 ```bash
 curl -X POST "http://localhost:8000/chat/" \
+  -H "Authorization: a20d4fdd36062aa2bd56b6ee8b92cd1a" \
   -F "query=What can you see in this image?" \
   -F "chat_history=[]" \
   -F "document_id=your_document_id" \
@@ -37,6 +50,10 @@ Example using Python:
 import requests
 import json
 
+headers = {
+    'Authorization': 'a20d4fdd36062aa2bd56b6ee8b92cd1a'
+}
+
 files = {
     'images': ('image.jpg', open('/path/to/your/image.jpg', 'rb'), 'image/jpeg')
 }
@@ -48,7 +65,11 @@ data = {
     'user_id': 'your_user_id'
 }
 
-response = requests.post('http://localhost:8000/chat/', data=data, files=files, stream=True)
+response = requests.post('http://localhost:8000/chat/', 
+                        headers=headers, 
+                        data=data, 
+                        files=files, 
+                        stream=True)
 
 # Process streaming response
 for line in response.iter_lines():
@@ -82,6 +103,8 @@ for line in response.iter_lines():
    ```
 
 ## API Endpoints
+
+All endpoints require authentication headers as described above.
 
 - `/upload/` - Upload documents for vectorization
 - `/chat/` - Interactive chat with context from documents and optional images

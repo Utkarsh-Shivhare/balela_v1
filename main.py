@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from database import delete_document_by_document_id
@@ -24,6 +24,10 @@ import base64
 
 # Load environment variables
 load_dotenv()
+
+# Authentication configuration
+REQUIRED_API_KEY = "a20d4fdd36062aa2bd56b6ee8b92cd1a"
+
 class QuestionAnswerPair(BaseModel):
     question: str
     answer: str
@@ -41,12 +45,14 @@ class AssignmentInput(BaseModel):
 class FeedbackRequestBasedOnStrictness(BaseModel):
     input_content_text: str
     strictness_level: str
+
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 # Get API key from environment variable
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "YOUR_API_KEY_HERE")  # Default placeholder for documentation
+
 # Check if API key is available
 if OPENAI_API_KEY == "YOUR_API_KEY_HERE":
     logger.warning("No valid API key found. Please set your OPENAI_API_KEY in the .env file.")
@@ -57,6 +63,34 @@ app = FastAPI(
     description="API for uploading documents and chatting with OpenAI",
     version="1.0.0"
 )
+
+# Authentication middleware
+@app.middleware("http")
+async def authenticate_request(request: Request, call_next):
+    """
+    Middleware to check for authentication key in headers
+    """
+    # Skip authentication for root endpoint (for health checks)
+    if request.url.path == "/":
+        response = await call_next(request)
+        return response
+    
+    # Check for authentication header
+    auth_key = request.headers.get("Authorization") or request.headers.get("X-API-Key") or request.headers.get("api-key")
+    
+    if not auth_key or auth_key != REQUIRED_API_KEY:
+        logger.warning(f"Unauthorized access attempt from {request.client.host if request.client else 'unknown'}")
+        return JSONResponse(
+            status_code=400,
+            content={
+                "error": "Authentication required",
+                "message": "Valid API key must be provided in headers (Authorization, X-API-Key, or api-key)"
+            }
+        )
+    
+    # If authentication passes, continue with the request
+    response = await call_next(request)
+    return response
 
 # Set up CORS
 app.add_middleware(
