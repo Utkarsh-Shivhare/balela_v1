@@ -46,6 +46,9 @@ class FeedbackRequestBasedOnStrictness(BaseModel):
     input_content_text: str
     strictness_level: str
 
+class GrammarRequest(BaseModel):
+    user_input: str
+
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -599,7 +602,7 @@ async def test_and_exam_analyser(request: Test_Analyzer_Request):
 
 # Writing Assistant APIs - Placeholder implementations
 @app.post("/grammer_and_language_support/", tags=['Writing Assistant'])
-async def grammer_and_language_support_writer(user_input: str):
+async def grammer_and_language_support_writer(data: GrammarRequest):
     """
     Processes input text for grammar corrections and language improvements.
 
@@ -613,6 +616,7 @@ async def grammer_and_language_support_writer(user_input: str):
     - status (str): `"success"` if processing is successful.
     - response (str): Corrected text with grammar and language improvements.
     """
+    user_input = data.user_input
     try:
         writing_assistant_instance = WritingAssistant(OPENAI_API_KEY)
         corrected_response = writing_assistant_instance.call_grammar_and_language_support_agent(user_input)
