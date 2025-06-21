@@ -264,6 +264,7 @@ async def chat(
         
         # Get context resources
         sources_formatted = chatbot.get_context_resources_from_db(query, user_id, document_id)
+        sources_formatted=""
         
         # Process images if provided
         image_data = []
