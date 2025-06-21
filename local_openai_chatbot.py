@@ -195,10 +195,10 @@ class LocalOpenAIChatBot:
         return formatted_sources
 
     def generate_response_stream(self, query, sources_formatted, chat_history, image_data=None):
-        """Generate streaming response using the language model."""
+        """Generate streaming response from LLM, with optional images."""
         logger.info("Streaming response generation using Prompt Template.")
         try:
-            # When no images are provided, use the normal prompt
+            # If no images are provided: normal text prompt flow
             if not image_data:
                 chain = self.prompt | self.llm | StrOutputParser()
                 response = chain.stream({
@@ -209,30 +209,29 @@ class LocalOpenAIChatBot:
                 for chunk in response:
                     yield chunk
             else:
-                # When images are provided, prepare messages with multimodal content
+                # Images present: use multimodal format
                 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
-                
-                # Convert chat history to message format
+    
                 messages = []
+    
+                # ✅ Parse chat history into message objects
                 for msg in chat_history:
-                    if msg["role"] == "user":
-                        messages.append(HumanMessage(content=msg["content"]))
-                    elif msg["role"] == "assistant":
-                        messages.append(AIMessage(content=msg["content"]))
-                
-                # Create more informative system message
-                system_prompt = self.GROUNDED_PROMPT  
-                
+                    if isinstance(msg, dict) and "role" in msg and "content" in msg:
+                        if msg["role"] == "user":
+                            messages.append(HumanMessage(content=msg["content"]))
+                        elif msg["role"] == "assistant":
+                            messages.append(AIMessage(content=msg["content"]))
+                    else:
+                        logger.warning(f"Skipping malformed chat history message: {msg}")
+    
+                # Build system message with optional grounded context
+                system_prompt = self.GROUNDED_PROMPT
                 if sources_formatted and sources_formatted != "No relevant sources found.":
-                    system_prompt += f"Here is context information that might be helpful:\n\n{sources_formatted}"
-                
-                system_message = SystemMessage(content=system_prompt)
-                messages.append(system_message)
-                
-                # Create the human message with image content
+                    system_prompt += f"\n\nHere is context information that might be helpful:\n{sources_formatted}"
+                messages.append(SystemMessage(content=system_prompt))
+    
+                # Add human multimodal message
                 content_blocks = [{"type": "text", "text": query}]
-                
-                # Add images to the content blocks
                 for img in image_data:
                     content_blocks.append({
                         "type": "image_url",
@@ -240,21 +239,20 @@ class LocalOpenAIChatBot:
                             "url": f"data:{img['mime_type']};base64,{img['base64_data']}"
                         }
                     })
-                
-                # Add the multimodal message
                 messages.append(HumanMessage(content=content_blocks))
-                
-                # Log what we're sending to the model
-                logger.info(f"Sending message with {len(content_blocks) - 1} images to the model")
-                
-                # Stream the response
+    
+                logger.info(f"Sending {len(content_blocks)-1} image(s) with the prompt.")
+    
+                # Stream the response from the LLM
                 response = self.llm.stream(messages)
                 for chunk in response:
-                    if chunk.content:
+                    if hasattr(chunk, "content") and chunk.content:
                         yield chunk.content
+    
         except Exception as e:
             logger.error(f"Error during streaming generation: {str(e)}")
             yield json.dumps({"error": str(e)})
+
 
     def get_context_resources_from_db(self, query, user_id, document_id):
         """Get relevant context from the vector store."""
