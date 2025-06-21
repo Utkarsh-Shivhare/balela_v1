@@ -269,6 +269,7 @@ async def chat(
         # Process images if provided
         image_data = []
         for img in images:
+            print("the image have been recieved",img)
             # Read the image data
             img_content = await img.read()
             # Convert to base64
