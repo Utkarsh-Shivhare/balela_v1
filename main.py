@@ -259,38 +259,38 @@ async def chat(
     """
     logger.info(f"Chat endpoint called for user_id: {user_id}, document_id: {document_id}, with {len(images)} images")
     try:
-        # Parse chat history
-        chat_history_obj = json.loads(chat_history) if chat_history else []
-        
-        # Get context resources
+        # Parse and validate chat_history
+        try:
+            chat_history_obj = json.loads(chat_history)
+            if not isinstance(chat_history_obj, list):
+                raise ValueError("chat_history must be a list")
+        except Exception as e:
+            logger.warning(f"Invalid chat_history format: {chat_history}. Error: {e}")
+            chat_history_obj = []
+
+        # Get relevant context (optional logic; can be removed if not needed)
         sources_formatted = chatbot.get_context_resources_from_db(query, user_id, document_id)
-        sources_formatted=""
-        
-        # Process images if provided
+        if not sources_formatted:
+            sources_formatted = ""
+
+        # Read and encode images
         image_data = []
-        logger.info(f"the image have been passed {images}")
         for img in images:
-            print("the image have been recieved",img)
-            logger.info(f"the image have been passed {img}")
-            # Read the image data
+            logger.info(f"Received image: {img.filename}")
             img_content = await img.read()
-            # Convert to base64
             base64_img = base64.b64encode(img_content).decode("utf-8")
-            # Get the MIME type
-            mime_type = img.content_type or "image/jpeg"  # Default to JPEG if not provided
-            
-            # Store the image data
+            mime_type = img.content_type or "image/jpeg"
             image_data.append({
                 "base64_data": base64_img,
                 "mime_type": mime_type
             })
-        
-        # Return a StreamingResponse with the generator directly
+
+        # Stream response back to the client
         return StreamingResponse(
             chatbot.generate_response_stream(query, sources_formatted, chat_history_obj, image_data),
             media_type='text/event-stream'
         )
-        
+
     except Exception as e:
         logger.error(f"Error in chat endpoint: {str(e)}")
         return JSONResponse(
