@@ -98,7 +98,7 @@ async def authenticate_request(request: Request, call_next):
 # Set up CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:*","https://balela.co.za/backend","https://balela.co.za/","*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
