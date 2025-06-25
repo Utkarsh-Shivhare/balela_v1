@@ -111,6 +111,21 @@ All endpoints require authentication headers as described above.
 - `/delete_document/` - Remove documents from the system
 - Additional endpoints for learning and writing assistance features
 
+
+sudo nano /etc/nginx/sites-available/balela
+
+server {
+    listen 80;
+    server_name 209.97.187.195;  # Replace with your domain if available
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+}
+
 ## License
 
 [License Information] 
